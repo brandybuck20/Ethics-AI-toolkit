@@ -182,56 +182,19 @@ def handle_model_upload(uploaded_file):
         st.info("Please ensure your model is saved using joblib or pickle and is compatible with scikit-learn.")
 
 def load_demo_model():
-    """Load a demonstration model for testing"""
+    """Load a demonstration model for testing - simplified to show static results"""
     try:
         st.session_state.bias_audit_task_id = None
-        # Create a simple demo model
-        from sklearn.datasets import make_classification
-        from sklearn.model_selection import train_test_split
-        import tempfile
         
-        # Generate demo data
-        X, y = make_classification(
-            n_samples=1000,
-            n_features=10,
-            n_informative=8,
-            n_redundant=2,
-            n_classes=2,
-            random_state=42
-        )
-        
-        # Create feature names
-        feature_names = [f'feature_{i}' for i in range(X.shape[1])]
-        
-        # Train a demo model
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        
-        demo_model = RandomForestClassifier(n_estimators=100, random_state=42)
-        demo_model.fit(X_train, y_train)
-        
-        # Save model to temporary file
-        with tempfile.NamedTemporaryFile(suffix='.joblib', delete=False) as tmp:
-            joblib.dump(demo_model, tmp.name)
-            tmp_path = tmp.name
-        
-        # Load demo model from backend
-        with st.spinner("Loading demo model from server..."):
-            api_client = st.session_state.api_client
-            # Call a dummy endpoint for demonstration purposes that returns a mock model ID
-            # In a real scenario, you might have a specific backend endpoint for loading demo models
-            response = api_client.run_bias_audit(
-                protected_attributes=["gender"], # Dummy attributes
-                target_column="approved", # Dummy target
-                is_demo=True # Request demo data
-            )
-            
-            # Store model metadata
+        # Simply set the session state without actually creating a model
+        with st.spinner("Loading demo model..."):
+            # Store model metadata directly without API call
             st.session_state.uploaded_model = True
             st.session_state.model_metadata = {
                 'filename': 'demo_model.joblib',
                 'model_id': "demo_model_id", # Static ID for demo
                 'type': "RandomForestClassifier (Demo)",
-                'upload_time': response.get('timestamp', 'Unknown'), # Use timestamp from demo response
+                'upload_time': "2025-07-25T08:00:00Z", # Static timestamp
                 'is_demo': True
             }
         
@@ -322,57 +285,21 @@ def handle_dataset_upload(uploaded_file):
         st.info("Please ensure your file is a valid CSV with proper formatting.")
 
 def load_demo_dataset():
-    """Load demonstration dataset"""
+    """Load demonstration dataset - simplified to show static results"""
     try:
-        # Create demo dataset compatible with demo model
-        np.random.seed(42)
-        n_samples = 1000
-        
-        # Generate synthetic data with bias
-        data = {
-            'age': np.random.randint(18, 80, n_samples),
-            'gender': np.random.choice(['Male', 'Female'], n_samples, p=[0.6, 0.4]),
-            'race': np.random.choice(['White', 'Black', 'Hispanic', 'Asian'], n_samples, p=[0.5, 0.2, 0.2, 0.1]),
-            'income': np.random.normal(50000, 20000, n_samples),
-            'credit_score': np.random.randint(300, 850, n_samples),
-            'education': np.random.choice(['High School', 'Bachelor', 'Master', 'PhD'], n_samples, p=[0.3, 0.4, 0.2, 0.1]),
-        }
-        
-        # Add 10 feature columns to match demo model
-        for i in range(10):
-            data[f'feature_{i}'] = np.random.normal(0, 1, n_samples)
-        
-        # Create biased target variable
-        bias_factor = (data['gender'] == 'Male').astype(int) * 0.3
-        bias_factor += (data['race'] == 'White').astype(int) * 0.2
-        probabilities = 1 / (1 + np.exp(-(np.random.normal(0, 1, n_samples) + bias_factor)))
-        data['approved'] = (probabilities > 0.5).astype(int)
-        
-        df = pd.DataFrame(data)
-        
-        # Save to temporary CSV file
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as tmp:
-            df.to_csv(tmp.name, index=False)
-            tmp_path = tmp.name
-        
-        # Load demo dataset from backend
-        with st.spinner("Loading demo dataset from server..."):
-            api_client = st.session_state.api_client
-            # Call a dummy endpoint for demonstration purposes that returns mock dataset info
-            response = api_client.run_explainability_analysis( # Using explainability as a proxy
-                target_column="approved", # Dummy target
-                is_demo=True # Request demo data
-            )
+        # Simply set the session state without actually creating a dataset
+        with st.spinner("Loading demo dataset..."):
+            # Create a static list of columns for the demo dataset
+            columns = ['age', 'gender', 'race', 'income', 'credit_score', 'education'] + [f'feature_{i}' for i in range(10)] + ['approved']
             
-            # Store dataset metadata
-            st.session_state.uploaded_dataset = pd.DataFrame(np.random.rand(100, 10), columns=[f'feature_{i}' for i in range(10)])
+            # Store dataset metadata directly without API call
+            st.session_state.uploaded_dataset = True
             st.session_state.dataset_metadata = {
                 'filename': 'demo_dataset.csv',
                 'dataset_id': "demo_dataset_id", # Static ID for demo
-                'shape': st.session_state.uploaded_dataset.shape,
-                'columns': st.session_state.uploaded_dataset.columns.tolist(),
-                'upload_time': response.get('timestamp', 'Unknown'), # Use timestamp from demo response
+                'shape': (1000, len(columns)),
+                'columns': columns,
+                'upload_time': "2025-07-25T08:00:00Z", # Static timestamp
                 'is_demo': True
             }
         
