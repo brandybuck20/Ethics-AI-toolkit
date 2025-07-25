@@ -168,12 +168,31 @@ def render_model_data_verification():
             with st.expander("Dataset Details"):
                 st.write("**Shape:**", metadata.get('shape', 'Unknown'))
                 st.write("**Columns:**", len(metadata.get('columns', [])))
-                if st.session_state.get('uploaded_dataset') is not None:
+                if isinstance(st.session_state.get('uploaded_dataset'), pd.DataFrame):
                     st.write("**Sample:**")
                     st.dataframe(st.session_state.uploaded_dataset.head(3))
                 elif st.session_state.get('model_metadata', {}).get('is_demo'):
                     st.info("💡 Using demo dataset for explainability. No need to upload.")
-                    st.session_state.uploaded_dataset = pd.DataFrame(np.random.rand(100, 10), columns=[f'feature_{i}' for i in range(10)])
+                    # Create a sample DataFrame with random data
+                    import numpy as np
+                    data = {
+                        'age': np.random.randint(18, 80, 100),
+                        'gender': np.random.choice(['Male', 'Female'], 100),
+                        'income': np.random.randint(20000, 150000, 100),
+                        'credit_score': np.random.randint(300, 850, 100)
+                    }
+                    
+                    # Add feature columns
+                    for i in range(10):
+                        data[f'feature_{i}'] = np.random.rand(100)
+                    
+                    # Add target column
+                    data['target'] = np.random.choice([0, 1], 100)
+                    
+                    # Create DataFrame
+                    st.session_state.uploaded_dataset = pd.DataFrame(data)
+                    
+                    # Store dataset metadata
                     st.session_state.dataset_metadata = {
                         'filename': 'demo_explainability_dataset.csv',
                         'dataset_id': 'demo_explainability_dataset_id',
@@ -181,6 +200,25 @@ def render_model_data_verification():
                         'columns': st.session_state.uploaded_dataset.columns.tolist(),
                         'upload_time': 'N/A',
                         'is_demo': True
+                    }
+                    
+                    # Show sample data
+                    st.write("**Sample:**")
+                    st.dataframe(st.session_state.uploaded_dataset.head(3))
+                    
+                    # Add static explainability results
+                    st.session_state.explainability_results = {
+                        "method": "shap",
+                        "top_features": [
+                            {"feature": "credit_score", "importance": 0.32},
+                            {"feature": "income", "importance": 0.21},
+                            {"feature": "age", "importance": 0.18},
+                            {"feature": "feature_2", "importance": 0.15},
+                            {"feature": "feature_5", "importance": 0.09}
+                        ],
+                        "explanation": "The model's prediction is most influenced by credit score, income, and age.",
+                        "sample_size": 100,
+                        "timestamp": "2025-07-25T08:00:00Z"
                     }
                 else:
                     st.error("❌ No dataset loaded")

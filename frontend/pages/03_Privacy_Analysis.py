@@ -263,25 +263,124 @@ def render_input_selection():
             load_demo_privacy_scenario(demo_scenario)
 
 def load_demo_privacy_scenario(scenario):
-    """Load demonstration privacy scenario"""
+    """Load demonstration privacy scenario with static data"""
     
-    # Call backend with is_demo=True for privacy analysis
     try:
-        api_client = st.session_state.api_client
-        # This calls the privacy analysis endpoint with is_demo=True
-        # The specific content returned depends on the backend's demo implementation
-        response = api_client.run_explainability_analysis(
-            target_column="dummy", # Dummy target column
-            is_demo=True # Request demo data
-        )
-
-        # Use mock data from backend response
-        st.session_state.text_input_for_analysis = response.get("explanation", "Demo text from backend.")
-        st.session_state.demo_pii_types = ["names", "emails"] # Placeholder, backend should provide this
+        # Create static demo data based on the selected scenario
+        demo_texts = {
+            "Customer Support Chat Logs": """
+            Customer: Hi, my name is John Smith and I need help with my account.
+            Agent: Hello John, I'd be happy to help. Can you provide your account number or email?
+            Customer: Sure, my email is john.smith@example.com and my phone is 555-123-4567.
+            Agent: Thank you. I can see your account. Your last transaction was on July 15th for $250.00.
+            """,
+            
+            "Medical Records Sample": """
+            Patient: Sarah Johnson
+            DOB: 04/12/1985
+            SSN: 123-45-6789
+            Diagnosis: Type 2 Diabetes
+            Medication: Metformin 500mg twice daily
+            Doctor: Dr. Michael Chen
+            """,
+            
+            "Financial Transaction Data": """
+            Account Holder: Robert Williams
+            Account #: 9876543210
+            Transaction History:
+            - 07/20/2025: Deposit $1,500.00
+            - 07/18/2025: Withdrawal $200.00 ATM #1234
+            - 07/15/2025: Payment to Mortgage Company $950.00
+            """,
+            
+            "HR Employee Database": """
+            Employee ID: EMP-2025-0042
+            Name: Jennifer Garcia
+            Position: Senior Marketing Manager
+            Salary: $85,000
+            Address: 123 Main Street, Anytown, CA 90210
+            Emergency Contact: David Garcia (Husband) - 555-987-6543
+            """,
+            
+            "Social Media Posts": """
+            @user1: Just moved to my new apartment at 456 Park Avenue! So excited!
+            @user2: Congrats! When's the housewarming party?
+            @user1: This Saturday at 7pm! Bring friends! My number is 555-555-1234 if you get lost.
+            """
+        }
+        
+        # Create a pandas DataFrame for the dataset
+        import pandas as pd
+        import numpy as np
+        
+        # Create a sample DataFrame with PII data
+        data = {
+            'name': ['John Smith', 'Sarah Johnson', 'Robert Williams', 'Jennifer Garcia', 'David Brown'],
+            'email': ['john.smith@example.com', 'sarah.j@example.com', 'rwilliams@example.com', 'jgarcia@example.com', 'dbrown@example.com'],
+            'phone': ['555-123-4567', '555-234-5678', '555-345-6789', '555-456-7890', '555-567-8901'],
+            'address': ['123 Main St', '456 Oak Ave', '789 Pine Rd', '321 Maple Dr', '654 Cedar Ln'],
+            'ssn': ['123-45-6789', '234-56-7890', '345-67-8901', '456-78-9012', '567-89-0123'],
+            'transaction_amount': [250.00, 1500.00, 950.00, 85000.00, 1200.00]
+        }
+        
+        # Create DataFrame
+        df = pd.DataFrame(data)
+        
+        # Set session state variables
+        st.session_state.uploaded_dataset = df
+        st.session_state.text_input_for_analysis = demo_texts.get(scenario, "Demo text for privacy analysis.")
+        st.session_state.demo_pii_types = ["names", "emails", "phone_numbers", "addresses", "ssn"]
         st.session_state.analysis_input_type = 'demo'
-        st.success(f"✅ Loaded demo scenario: {scenario} from backend.")
+        
+        # Add static privacy analysis results
+        st.session_state.privacy_results = {
+            "overall_score": 9.2,
+            "findings": [
+                {"type": "PII", "description": "Email address detected", "severity": "medium", "count": 5},
+                {"type": "PII", "description": "Phone number detected", "severity": "medium", "count": 5},
+                {"type": "PII", "description": "SSN detected", "severity": "high", "count": 5},
+                {"type": "PII", "description": "Name detected", "severity": "low", "count": 5},
+                {"type": "PII", "description": "Address detected", "severity": "medium", "count": 5}
+            ],
+            "summary": {
+                "risk_level": "Medium",
+                "recommendations": [
+                    "Remove SSN from dataset",
+                    "Mask phone numbers",
+                    "Encrypt email addresses",
+                    "Use ID numbers instead of names"
+                ]
+            },
+            "timestamp": "2025-07-25T08:00:00Z"
+        }
+        
+        st.success(f"✅ Loaded demo scenario: {scenario}")
     except Exception as e:
-        st.error(f"❌ Error loading demo privacy scenario from backend: {str(e)}")
+        # Even if there's an error, set static results
+        import pandas as pd
+        st.session_state.uploaded_dataset = pd.DataFrame({
+            'name': ['John Smith', 'Sarah Johnson'],
+            'email': ['john.smith@example.com', 'sarah.j@example.com'],
+            'ssn': ['123-45-6789', '234-56-7890']
+        })
+        st.session_state.text_input_for_analysis = "Demo text for privacy analysis with names like John Smith and emails like john.smith@example.com."
+        st.session_state.demo_pii_types = ["names", "emails"]
+        st.session_state.analysis_input_type = 'demo'
+        st.session_state.privacy_results = {
+            "overall_score": 9.2,
+            "findings": [
+                {"type": "PII", "description": "Email address detected", "severity": "medium", "count": 2},
+                {"type": "PII", "description": "SSN detected", "severity": "high", "count": 2},
+                {"type": "PII", "description": "Name detected", "severity": "low", "count": 2}
+            ],
+            "summary": {
+                "risk_level": "Medium",
+                "recommendations": ["Remove PII from dataset", "Mask sensitive fields"]
+            },
+            "timestamp": "2025-07-25T08:00:00Z"
+        }
+        st.success(f"✅ Loaded demo scenario with static data")
+        st.warning(f"Note: Used static demo data due to error: {str(e)}")
 
 def render_privacy_configuration():
     """Render privacy analysis configuration"""
