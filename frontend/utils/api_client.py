@@ -33,6 +33,38 @@ class APIClient:
         
         return st.session_state.api_session_id
     
+    def _send_post_request(self, endpoint: str, data: Dict[str, Any], is_demo: bool = False, is_json: bool = False) -> Dict[str, Any]:
+        params = {"session_id": self.session_id}
+        if is_demo:
+            params["is_demo"] = "true"
+        
+        if is_json:
+            response = requests.post(
+                f"{self.base_url}{endpoint}",
+                json=data, # Send as JSON
+                params=params
+            )
+        else:
+            response = requests.post(
+                f"{self.base_url}{endpoint}",
+                data=data,
+                params=params
+            )
+        response.raise_for_status()
+        return response.json()
+
+    def _send_get_request(self, endpoint: str, is_demo: bool = False) -> Dict[str, Any]:
+        params = {"session_id": self.session_id}
+        if is_demo:
+            params["is_demo"] = "true"
+        
+        response = requests.get(
+            f"{self.base_url}{endpoint}",
+            params=params
+        )
+        response.raise_for_status()
+        return response.json()
+
     def upload_model(self, model_file) -> Dict[str, Any]:
         """
         Upload a model file to the backend.
@@ -79,11 +111,12 @@ class APIClient:
             logger.error(f"Failed to upload dataset: {str(e)}")
             raise ValueError(f"Failed to upload dataset: {str(e)}")
     
-    def run_bias_audit(self, 
+    def run_bias_audit(self,
                       protected_attributes: List[str],
                       target_column: str,
                       bias_threshold: float = 0.1,
-                      fairness_metrics: List[str] = ["demographic_parity", "equalized_odds"]) -> Dict[str, Any]:
+                      fairness_metrics: List[str] = ["demographic_parity", "equalized_odds"],
+                      is_demo: bool = False) -> Dict[str, Any]:
         """
         Run a bias audit on the uploaded model and dataset.
         
@@ -92,24 +125,19 @@ class APIClient:
             target_column: Target column name
             bias_threshold: Bias threshold
             fairness_metrics: List of fairness metrics to calculate
+            is_demo: Whether to run in demo mode
             
         Returns:
             Dict containing the task information
         """
         try:
             data = {
-                "protected_attributes": json.dumps(protected_attributes),
+                "protected_attributes": protected_attributes,
                 "target_column": target_column,
-                "bias_threshold": str(bias_threshold),
-                "fairness_metrics": ",".join(fairness_metrics)
+                "bias_threshold": bias_threshold,
+                "fairness_metrics": fairness_metrics
             }
-            response = requests.post(
-                f"{self.base_url}/api/v1/bias/audit",
-                data=data,
-                params={"session_id": self.session_id}
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_post_request("/api/v1/bias/audit", data, is_demo, is_json=True)
         except Exception as e:
             logger.error(f"Failed to run bias audit: {str(e)}")
             raise ValueError(f"Failed to run bias audit: {str(e)}")
@@ -134,11 +162,11 @@ class APIClient:
             logger.error(f"Failed to get task status: {str(e)}")
             raise ValueError(f"Failed to get task status: {str(e)}")
     
-    def wait_for_task_completion(self, 
-                               task_id: str, 
-                               timeout: int = 300, 
-                               poll_interval: int = 1,
-                               progress_callback=None) -> Dict[str, Any]:
+    def wait_for_task_completion(self,
+                                task_id: str,
+                                timeout: int = 300,
+                                poll_interval: int = 1,
+                                progress_callback=None) -> Dict[str, Any]:
         """
         Wait for a background task to complete.
         
@@ -178,7 +206,8 @@ class APIClient:
                                   target_column: str,
                                   method: str = "shap",
                                   sample_size: int = 200,
-                                  num_features: int = 10) -> Dict[str, Any]:
+                                  num_features: int = 10,
+                                  is_demo: bool = False) -> Dict[str, Any]:
         """
         Run an explainability analysis on the uploaded model and dataset.
         
@@ -187,6 +216,7 @@ class APIClient:
             method: Explainability method (shap, lime)
             sample_size: Number of samples to use
             num_features: Number of features to include in explanation
+            is_demo: Whether to run in demo mode
             
         Returns:
             Dict containing the task information
@@ -195,27 +225,22 @@ class APIClient:
             data = {
                 "target_column": target_column,
                 "method": method,
-                "sample_size": str(sample_size),
-                "num_features": str(num_features)
+                "sample_size": sample_size,
+                "num_features": num_features
             }
-            response = requests.post(
-                f"{self.base_url}/api/v1/explainability/explain",
-                data=data,
-                params={"session_id": self.session_id}
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_post_request("/api/v1/explainability/explain", data, is_demo, is_json=True)
         except Exception as e:
             logger.error(f"Failed to run explainability analysis: {str(e)}")
             raise ValueError(f"Failed to run explainability analysis: {str(e)}")
     
-    def get_feature_importance(self, target_column: str, method: str = "permutation") -> Dict[str, Any]:
+    def get_feature_importance(self, target_column: str, method: str = "permutation", is_demo: bool = False) -> Dict[str, Any]:
         """
         Get feature importance for the uploaded model and dataset.
         
         Args:
             target_column: Target column name
             method: Feature importance method (permutation, model_based)
+            is_demo: Whether to run in demo mode
             
         Returns:
             Dict containing the feature importance results
@@ -225,22 +250,17 @@ class APIClient:
                 "target_column": target_column,
                 "method": method
             }
-            response = requests.post(
-                f"{self.base_url}/api/v1/explainability/feature-importance",
-                data=data,
-                params={"session_id": self.session_id}
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_post_request("/api/v1/explainability/feature-importance", data, is_demo, is_json=True)
         except Exception as e:
             logger.error(f"Failed to get feature importance: {str(e)}")
             raise ValueError(f"Failed to get feature importance: {str(e)}")
     
-    def detect_hallucinations(self, 
+    def detect_hallucinations(self,
                             text_content: str,
                             detection_types: List[str] = ["factual", "urls", "citations"],
                             sensitivity_level: str = "balanced",
-                            confidence_threshold: float = 0.6) -> Dict[str, Any]:
+                            confidence_threshold: float = 0.6,
+                            is_demo: bool = False) -> Dict[str, Any]:
         """
         Detect hallucinations in text.
         
@@ -249,6 +269,7 @@ class APIClient:
             detection_types: Types of hallucinations to detect
             sensitivity_level: Sensitivity level (low, balanced, high)
             confidence_threshold: Confidence threshold
+            is_demo: Whether to run in demo mode
             
         Returns:
             Dict containing the hallucination detection results
@@ -256,23 +277,17 @@ class APIClient:
         try:
             data = {
                 "text_content": text_content,
-                "detection_types": ",".join(detection_types),
+                "detection_types": detection_types,
                 "sensitivity_level": sensitivity_level,
-                "confidence_threshold": str(confidence_threshold),
-                "verify_links": "true"
+                "confidence_threshold": confidence_threshold,
+                "verify_links": True
             }
-            response = requests.post(
-                f"{self.base_url}/api/v1/hallucination/detect",
-                data=data,
-                params={"session_id": self.session_id}
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_post_request("/api/v1/hallucination/detect", data, is_demo, is_json=True)
         except Exception as e:
             logger.error(f"Failed to detect hallucinations: {str(e)}")
             raise ValueError(f"Failed to detect hallucinations: {str(e)}")
     
-    def get_bias_results(self) -> Dict[str, Any]:
+    def get_bias_results(self, is_demo: bool = False) -> Dict[str, Any]:
         """
         Get all bias audit results for the current session.
         
@@ -280,16 +295,12 @@ class APIClient:
             Dict containing the bias audit results
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/v1/bias/results/{self.session_id}"
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_get_request(f"/api/v1/bias/results/{self.session_id}", is_demo)
         except Exception as e:
             logger.error(f"Failed to get bias results: {str(e)}")
             raise ValueError(f"Failed to get bias results: {str(e)}")
     
-    def get_explainability_results(self) -> Dict[str, Any]:
+    def get_explainability_results(self, is_demo: bool = False) -> Dict[str, Any]:
         """
         Get all explainability results for the current session.
         
@@ -297,16 +308,12 @@ class APIClient:
             Dict containing the explainability results
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/v1/explainability/results/{self.session_id}"
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_get_request(f"/api/v1/explainability/results/{self.session_id}", is_demo)
         except Exception as e:
             logger.error(f"Failed to get explainability results: {str(e)}")
             raise ValueError(f"Failed to get explainability results: {str(e)}")
     
-    def get_hallucination_results(self) -> Dict[str, Any]:
+    def get_hallucination_results(self, is_demo: bool = False) -> Dict[str, Any]:
         """
         Get all hallucination detection results for the current session.
         
@@ -314,39 +321,31 @@ class APIClient:
             Dict containing the hallucination detection results
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/v1/hallucination/results/{self.session_id}"
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_get_request(f"/api/v1/hallucination/results/{self.session_id}", is_demo)
         except Exception as e:
             logger.error(f"Failed to get hallucination results: {str(e)}")
             raise ValueError(f"Failed to get hallucination results: {str(e)}")
     
-    def quick_bias_check(self, protected_attributes: List[str], target_column: str) -> Dict[str, Any]:
+    def quick_bias_check(self, protected_attributes: List[str], target_column: str, is_demo: bool = False) -> Dict[str, Any]:
         """
         Run a quick bias check on the uploaded model and dataset.
         
         Args:
             protected_attributes: List of protected attribute column names
             target_column: Target column name
+            is_demo: Whether to run in demo mode
             
         Returns:
             Dict containing the quick bias check results
         """
         try:
-            response = requests.post(
-                f"{self.base_url}/api/v1/bias/quick-check",
-                json={"protected_attributes": protected_attributes, "target_column": target_column},
-                params={"session_id": self.session_id}
-            )
-            response.raise_for_status()
-            return response.json()
+            data = {"protected_attributes": protected_attributes, "target_column": target_column}
+            return self._send_post_request("/api/v1/bias/quick-check", data, is_demo, is_json=True)
         except Exception as e:
             logger.error(f"Failed to run quick bias check: {str(e)}")
             raise ValueError(f"Failed to run quick bias check: {str(e)}")
     
-    def get_available_metrics(self) -> Dict[str, Any]:
+    def get_available_metrics(self, is_demo: bool = False) -> Dict[str, Any]:
         """
         Get available fairness metrics.
         
@@ -354,16 +353,12 @@ class APIClient:
             Dict containing the available metrics
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/v1/bias/metrics"
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_get_request("/api/v1/bias/metrics", is_demo)
         except Exception as e:
             logger.error(f"Failed to get available metrics: {str(e)}")
             raise ValueError(f"Failed to get available metrics: {str(e)}")
     
-    def get_available_explanation_methods(self) -> Dict[str, Any]:
+    def get_available_explanation_methods(self, is_demo: bool = False) -> Dict[str, Any]:
         """
         Get available explanation methods.
         
@@ -371,16 +366,12 @@ class APIClient:
             Dict containing the available methods
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/v1/explainability/methods"
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_get_request("/api/v1/explainability/methods", is_demo)
         except Exception as e:
             logger.error(f"Failed to get available explanation methods: {str(e)}")
             raise ValueError(f"Failed to get available explanation methods: {str(e)}")
     
-    def get_available_detection_types(self) -> Dict[str, Any]:
+    def get_available_detection_types(self, is_demo: bool = False) -> Dict[str, Any]:
         """
         Get available hallucination detection types.
         
@@ -388,11 +379,7 @@ class APIClient:
             Dict containing the available detection types
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/v1/hallucination/detection-types"
-            )
-            response.raise_for_status()
-            return response.json()
+            return self._send_get_request("/api/v1/hallucination/detection-types", is_demo)
         except Exception as e:
             logger.error(f"Failed to get available detection types: {str(e)}")
             raise ValueError(f"Failed to get available detection types: {str(e)}")

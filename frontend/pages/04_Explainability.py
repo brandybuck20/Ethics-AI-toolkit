@@ -168,12 +168,23 @@ def render_model_data_verification():
             with st.expander("Dataset Details"):
                 st.write("**Shape:**", metadata.get('shape', 'Unknown'))
                 st.write("**Columns:**", len(metadata.get('columns', [])))
-                if st.session_state.uploaded_dataset is not None:
+                if st.session_state.get('uploaded_dataset') is not None:
                     st.write("**Sample:**")
                     st.dataframe(st.session_state.uploaded_dataset.head(3))
-        else:
-            st.error("❌ No dataset loaded")
-            st.info("👆 Please upload a dataset in the Bias Audit section first")
+                elif st.session_state.get('model_metadata', {}).get('is_demo'):
+                    st.info("💡 Using demo dataset for explainability. No need to upload.")
+                    st.session_state.uploaded_dataset = pd.DataFrame(np.random.rand(100, 10), columns=[f'feature_{i}' for i in range(10)])
+                    st.session_state.dataset_metadata = {
+                        'filename': 'demo_explainability_dataset.csv',
+                        'dataset_id': 'demo_explainability_dataset_id',
+                        'shape': st.session_state.uploaded_dataset.shape,
+                        'columns': st.session_state.uploaded_dataset.columns.tolist(),
+                        'upload_time': 'N/A',
+                        'is_demo': True
+                    }
+                else:
+                    st.error("❌ No dataset loaded")
+                    st.info("👆 Please upload a dataset in the Bias Audit section first")
 
 def render_method_selection():
     """Render explainability method selection"""
@@ -484,20 +495,32 @@ def run_explainability_analysis():
             model = st.session_state.uploaded_model
             dataset = st.session_state.uploaded_dataset
             
-            # Initialize explainer
-            explainer = ModelExplainer(model, dataset, config)
-            
-            # Run analysis based on method
-            if method == 'shap':
-                results = explainer.generate_shap_explanations()
-            elif method == 'lime':
-                results = explainer.generate_lime_explanations()
-            elif method == 'custom':
-                results = explainer.generate_custom_explanations()
-            elif method == 'comparison':
-                results = explainer.generate_comparison_explanations()
+            is_demo_mode = st.session_state.model_metadata.get('is_demo', False) or \
+                           st.session_state.dataset_metadata.get('is_demo', False)
+
+            # Initialize explainer (or directly call API for demo)
+            if is_demo_mode:
+                api_client = st.session_state.api_client
+                results = api_client.run_explainability_analysis(
+                    target_column=config['target_column'],
+                    method=method,
+                    sample_size=config['sample_size'],
+                    num_features=config.get('num_features', 10),
+                    is_demo=True
+                )
             else:
-                raise ValueError(f"Unknown explainability method: {method}")
+                explainer = ModelExplainer(model, dataset, config)
+                # Run analysis based on method
+                if method == 'shap':
+                    results = explainer.generate_shap_explanations()
+                elif method == 'lime':
+                    results = explainer.generate_lime_explanations()
+                elif method == 'custom':
+                    results = explainer.generate_custom_explanations()
+                elif method == 'comparison':
+                    results = explainer.generate_comparison_explanations()
+                else:
+                    raise ValueError(f"Unknown explainability method: {method}")
             
             # Store results
             st.session_state.explainability_results = results

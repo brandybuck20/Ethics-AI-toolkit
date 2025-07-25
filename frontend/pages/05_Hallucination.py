@@ -515,7 +515,14 @@ def run_hallucination_detection():
             elif input_data['type'] == 'document_batch':
                 results = detector.analyze_documents(input_data['documents'])
             elif input_data['type'] == 'demo':
-                results = detector.analyze_text(input_data['content'], is_demo=True)
+                api_client = st.session_state.api_client
+                results = api_client.detect_hallucinations(
+                    text_content=input_data['content'],
+                    detection_types=config['detection_types'],
+                    sensitivity_level=config['sensitivity_level'],
+                    confidence_threshold=config['confidence_threshold'],
+                    is_demo=True
+                )
             else:
                 raise ValueError(f"Unknown input type: {input_data['type']}")
             

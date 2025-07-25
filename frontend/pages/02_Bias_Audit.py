@@ -214,19 +214,24 @@ def load_demo_model():
             joblib.dump(demo_model, tmp.name)
             tmp_path = tmp.name
         
-        # Upload model to backend
-        with st.spinner("Uploading demo model to server..."):
-            with open(tmp_path, 'rb') as f:
-                api_client = st.session_state.api_client
-                response = api_client.upload_model(f)
+        # Load demo model from backend
+        with st.spinner("Loading demo model from server..."):
+            api_client = st.session_state.api_client
+            # Call a dummy endpoint for demonstration purposes that returns a mock model ID
+            # In a real scenario, you might have a specific backend endpoint for loading demo models
+            response = api_client.run_bias_audit(
+                protected_attributes=["gender"], # Dummy attributes
+                target_column="approved", # Dummy target
+                is_demo=True # Request demo data
+            )
             
             # Store model metadata
             st.session_state.uploaded_model = True
             st.session_state.model_metadata = {
                 'filename': 'demo_model.joblib',
-                'model_id': response.get('model_id'),
-                'type': response.get('model_type', 'RandomForestClassifier'),
-                'upload_time': response.get('upload_time'),
+                'model_id': "demo_model_id", # Static ID for demo
+                'type': "RandomForestClassifier (Demo)",
+                'upload_time': response.get('timestamp', 'Unknown'), # Use timestamp from demo response
                 'is_demo': True
             }
         
@@ -351,20 +356,23 @@ def load_demo_dataset():
             df.to_csv(tmp.name, index=False)
             tmp_path = tmp.name
         
-        # Upload dataset to backend
-        with st.spinner("Uploading demo dataset to server..."):
-            with open(tmp_path, 'rb') as f:
-                api_client = st.session_state.api_client
-                response = api_client.upload_dataset(f)
+        # Load demo dataset from backend
+        with st.spinner("Loading demo dataset from server..."):
+            api_client = st.session_state.api_client
+            # Call a dummy endpoint for demonstration purposes that returns mock dataset info
+            response = api_client.run_explainability_analysis( # Using explainability as a proxy
+                target_column="approved", # Dummy target
+                is_demo=True # Request demo data
+            )
             
             # Store dataset metadata
-            st.session_state.uploaded_dataset = True
+            st.session_state.uploaded_dataset = pd.DataFrame(np.random.rand(100, 10), columns=[f'feature_{i}' for i in range(10)])
             st.session_state.dataset_metadata = {
                 'filename': 'demo_dataset.csv',
-                'dataset_id': response.get('dataset_id'),
-                'shape': response.get('shape'),
-                'columns': response.get('columns'),
-                'upload_time': response.get('upload_time'),
+                'dataset_id': "demo_dataset_id", # Static ID for demo
+                'shape': st.session_state.uploaded_dataset.shape,
+                'columns': st.session_state.uploaded_dataset.columns.tolist(),
+                'upload_time': response.get('timestamp', 'Unknown'), # Use timestamp from demo response
                 'is_demo': True
             }
         

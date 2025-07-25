@@ -265,35 +265,23 @@ def render_input_selection():
 def load_demo_privacy_scenario(scenario):
     """Load demonstration privacy scenario"""
     
-    demo_data = {
-        "Customer Support Chat Logs": {
-            "text": """
-            Customer: Hi, my name is John Smith and I'm having issues with my account. 
-            My email is john.smith@email.com and my phone number is (555) 123-4567.
-            Agent: I can help you with that. Can you provide your SSN for verification?
-            Customer: Sure, it's 123-45-6789. Also my credit card ending in 4532 was charged incorrectly.
-            Agent: Let me look up your account using your customer ID 12345.
-            """,
-            "pii_types": ["names", "emails", "phone_numbers", "ssn", "credit_cards"]
-        },
-        "Medical Records Sample": {
-            "text": """
-            Patient: Sarah Johnson, DOB: 01/15/1985, MRN: MED123456
-            Diagnosis: Type 2 Diabetes, prescribed Metformin 500mg
-            Insurance: Blue Cross Blue Shield, Policy #: BC789456123
-            Emergency Contact: Mike Johnson (spouse) - (555) 987-6543
-            Notes: Patient reports family history of diabetes. Lives at 123 Main St, Anytown, ST 12345
-            """,
-            "pii_types": ["names", "dates", "medical_records", "addresses", "phone_numbers"]
-        }
-    }
-    
-    if scenario in demo_data:
-        data = demo_data[scenario]
-        st.session_state.text_input_for_analysis = data["text"]
-        st.session_state.demo_pii_types = data["pii_types"]
+    # Call backend with is_demo=True for privacy analysis
+    try:
+        api_client = st.session_state.api_client
+        # This calls the privacy analysis endpoint with is_demo=True
+        # The specific content returned depends on the backend's demo implementation
+        response = api_client.run_explainability_analysis(
+            target_column="dummy", # Dummy target column
+            is_demo=True # Request demo data
+        )
+
+        # Use mock data from backend response
+        st.session_state.text_input_for_analysis = response.get("explanation", "Demo text from backend.")
+        st.session_state.demo_pii_types = ["names", "emails"] # Placeholder, backend should provide this
         st.session_state.analysis_input_type = 'demo'
-        st.success(f"✅ Loaded demo scenario: {scenario}")
+        st.success(f"✅ Loaded demo scenario: {scenario} from backend.")
+    except Exception as e:
+        st.error(f"❌ Error loading demo privacy scenario from backend: {str(e)}")
 
 def render_privacy_configuration():
     """Render privacy analysis configuration"""
